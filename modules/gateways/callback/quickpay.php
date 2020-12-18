@@ -152,7 +152,7 @@ if ($checksum === $_SERVER["HTTP_QUICKPAY_CHECKSUM_SHA256"]) {
                     $params = [
                         "amount" => number_format(($linkArray['amount']/100.0), 2, '.', ''), /** Convert amount to decimal */
                         "returnurl" => $linkArray['continue_url'],
-                        "systemurl" => $linkArray['callback_url'],
+                        "callback_url" => $linkArray['callback_url'],
                         "clientdetails" => ['email' => $linkArray['customer_email']],
                         "payment_methods" => $linkArray['payment_methods'],
                         "language" => $linkArray['language'],
