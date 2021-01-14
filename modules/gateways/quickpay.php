@@ -398,13 +398,13 @@ function helper_create_subscription($params)
     /** Check if invoice parent order is subscription type. */
     if ($recurringData && isset($recurringData['primaryserviceid'])) {
         /** Get active subscription id */
-        $result = select_query("tblhosting", "id, subscriptionid", ["orderid" => $recurringData['primaryserviceid']]);
+        $result = select_query("tblhosting", "id, subscriptionid", ["id" => $recurringData['primaryserviceid']]);
         $data = mysql_fetch_array($result);
         $activeSubscriptionId = $data['subscriptionid'];
     }
 
     /** Check if active subscription */
-    if (isset($activeSubscriptionId)) {
+    if (isset($activeSubscriptionId) && !empty($activeSubscriptionId)) {
         /** Do subscription recurring payment - null payment link expected*/
         $paymentLink = helper_create_payment_link($activeSubscriptionId, $params, 'recurring');
     } else {
@@ -447,7 +447,7 @@ function helper_create_payment_link($paymentId, $params, $type = 'payment')
 
     /** Quickpay API key */
     $apiKey = $params['apikey'];
-
+    
     /** Gateway request parameters array */
     $request = [
         "amount" => str_replace('.', '', $params['amount']),
@@ -470,7 +470,8 @@ function helper_create_payment_link($paymentId, $params, $type = 'payment')
     /** Check if transaction type is recurring */
     if ('recurring' === $type) {
         /** Construt orderid string */
-        $request["order_id"] = sprintf('%s%04d_r', $orderPrefix, $params['invoiceid']);
+        $request["order_id"] = sprintf('%s%04d_r', $params['prefix'], $params['invoiceid']);
+        $request["QuickPay-Callback-Url"] = $request['callback_url'];
 
         /** Request endpoint */
         $endpoint = sprintf('subscriptions/%s/recurring', $paymentId/** Subscription_id */);
@@ -609,6 +610,11 @@ function helper_quickpay_request($apikey = '', $endpoint = '', $params = [], $me
         'Accept: application/json',
         'Authorization: Basic ' . base64_encode(':' . $apikey),
     ];
+
+    /* Attach 'QuickPay-Callback-Url' request parameter to header request */
+    if(isset($params["QuickPay-Callback-Url"])){
+        array_push($headers, "QuickPay-Callback-Url:".$params["QuickPay-Callback-Url"]."");
+    }
 
     /** Request parameters */
     $options = [

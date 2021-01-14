@@ -17,6 +17,11 @@ Pull requests welcome!
 
 
 ## Changelog
+#### 2.4.1:
+ * Fix: Order prefix
+ * Fix: Wrong invoice total
+ * Fix: Attach 'QuickPay-Callback-Url' request parameter to header request
+
 #### 2.4.0:
  * Code refactoring;
  * Rebuild function that trigger "Create subscription" service to match requested parameters;

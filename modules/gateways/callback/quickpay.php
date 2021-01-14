@@ -45,7 +45,7 @@ if ($checksum === $_SERVER["HTTP_QUICKPAY_CHECKSUM_SHA256"]) {
 
     /** Strip prefix if any*/
     if (isset($gateway['prefix'])) {
-        $invoiceid = substr(explode('_', $invoiceid)[0], strlen($gateway['prefix']));
+        $invoiceid = explode('_',substr($invoiceid, strlen($gateway['prefix'])))[0];
     }
 
     /** Convert amount to decimal type */
@@ -97,8 +97,8 @@ if ($checksum === $_SERVER["HTTP_QUICKPAY_CHECKSUM_SHA256"]) {
             $values = [
                 'invoiceid' => $invoiceid,
                 'transid' => $transid,
-                'amount' => $amount,
-                'fee' => $fee,
+                'amount' => $tblinvoices['total'],
+                'fees' => $fee,
                 'gateway' => $gatewayModuleName
             ];
 
@@ -162,7 +162,8 @@ if ($checksum === $_SERVER["HTTP_QUICKPAY_CHECKSUM_SHA256"]) {
                         "quickpay_google_analytics_tracking_id" => $gateway['quickpay_google_analytics_tracking_id'],
                         "quickpay_google_analytics_client_id" => $gateway['quickpay_google_analytics_client_id'],
                         "apikey" => $gateway['apikey'],
-                        "invoiceid" => $invoiceid
+                        "invoiceid" => $invoiceid,
+                        "prefix" => $gateway['prefix']
                     ];
 
                     /** SET subscription id in tblhosting if is empty, in order to enable autobiling and cancel methods*/
