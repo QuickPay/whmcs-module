@@ -142,9 +142,14 @@ function quickpay_config()
             "Type" => "text",
             "Size" => "30"
         ],
+        "quickpay_custom_thankyou_url" => [
+            "FriendlyName" => "Custom Thank-You Page URL",
+            "Type" => "text",
+            "Size" => "60"
+        ],
         "quickpay_google_analytics_tracking_id" => [
-            "FriendlyName" => "Google Analytics Tracking ID", "
-            Type" => "text",
+            "FriendlyName" => "Google Analytics Tracking ID",
+            "Type" => "text",
             "Size" => "30"
         ],
         "quickpay_google_analytics_client_id" => [
@@ -447,12 +452,15 @@ function helper_create_payment_link($paymentId, $params, $type = 'payment')
 
     /** Quickpay API key */
     $apiKey = $params['apikey'];
-    
+
+    /** If quickpay_custom_thankyou_url field is empty set return URL to default value */
+    $return_url = (empty($params['quickpay_custom_thankyou_url'])) ? ($params['returnurl']) : ($params['systemurl'] . $params['quickpay_custom_thankyou_url']);
+
     /** Gateway request parameters array */
     $request = [
         "amount" => str_replace('.', '', $params['amount']),
-        "continue_url" => $params['returnurl'],
-        "cancel_url" => $params['returnurl'],
+        "continue_url" => $return_url,
+        "cancel_url" => $return_url,
         "callback_url" => (isset($params['callback_url'])) ? ($params['callback_url']) : ($params['systemurl'] . 'modules/gateways/callback/' . $params['paymentmethod'] . '.php'),
         "customer_email" => $params['clientdetails']['email'],
         "payment_methods" => $params['payment_methods'],
