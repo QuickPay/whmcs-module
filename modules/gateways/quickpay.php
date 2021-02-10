@@ -220,12 +220,11 @@ function quickpay_refund($params)
 
     /** Get invoice data */
     $invoice = localAPI(/**command*/'GetInvoice', /**postData*/['invoiceid' => $params['invoiceid']]);
-
-    /** Gateway request parameters */
+      
     $request = [
         'id' => $params['transid'],
         'amount' => str_replace('.', '', $params['amount']),
-        'vat_rate' => number_format((((float) $invoice['taxrate'] > 0) ? ((float) $invoice['taxrate']) : ((float) $invoice['taxrate2'])), 2, '.', '')
+        'vat_rate' => quickpay_getTotalTaxRate($invoice)
     ];
 
     /** Gateway retund request */
@@ -584,13 +583,15 @@ function helper_quickpay_request_params($params)
 
     /** Cart Items Parameters */
     $request_arr['basket'] = [];
+    $total_taxrate = quickpay_getTotalTaxRate($invoice);
     foreach ($invoice['items']['item'] as $item) {
+        $item_price = (int) $item['amount'];
         $request_arr['basket'][] = [
             'qty' => 1,
             'item_no' => (string)$item['id'],
             'item_name' => $item['description'],
             'item_price' => (int) $item['amount'],
-            'vat_rate' => number_format((((float) $invoice['taxrate']) > 0) ? ((float) $invoice['taxrate']) : ((float) $invoice['taxrate2']), 2, '.', '')
+            'vat_rate' => $item['taxed']==1?$total_taxrate:'0'
         ];
     }
 
@@ -752,5 +753,27 @@ function helper_getInvoiceType($invoiceid)
     } else {
         return 'payment';
     }
+}
+
+/**
+ * Calculate the total taxrate from the invoice
+ *
+ * @param array $invoice The invoice data
+ *
+ * @return float Total invoice taxrate
+ */
+function quickpay_getTotalTaxRate($invoice){
+   $total = 0;
+   /** Calculate price of taxable items */
+   foreach ($invoice['items']['item'] as $item) {
+       if($item['taxed']==1){
+           $total += (float) $item['amount'];
+       }
+   }
+   $total = number_format( ((float) $total) , 2, '.', '');
+   $tax_1 = number_format( ((float) $invoice['tax']) , 2, '.', '');
+   $tax_2 = number_format( ((float) $invoice['tax2']) , 2, '.', '');
+   /** Add all taxes */
+   return number_format((($tax_1 + $tax_2) / $total ), 3);
 }
 /************************** Utils functions END **************************/

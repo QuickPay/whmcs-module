@@ -47,3 +47,4 @@ Pull requests welcome!
     - Automatic at expiration.
  * Added "Refund" functionality for simple and recurring payments, can be triggered from Admin > Invoice screen.
  * Added "Custom Thank You Page" setup.
+ * Fixed VAT calculation
