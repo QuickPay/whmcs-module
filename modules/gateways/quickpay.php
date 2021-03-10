@@ -452,15 +452,19 @@ function helper_create_payment_link($paymentId, $params, $type = 'payment')
     /** Quickpay API key */
     $apiKey = $params['apikey'];
 
-    /** If quickpay_custom_thankyou_url field is empty set return URL to default value */
+    /** Create return page URL. If quickpay_custom_thankyou_url field is empty set return URL to default value */
     $return_url = (empty($params['quickpay_custom_thankyou_url'])) ? ($params['returnurl']) : ($params['systemurl'] . $params['quickpay_custom_thankyou_url']);
+    /** Create processing page URL */
+    $processing_url = $params['systemurl'] . 'modules/gateways/quickpay/quickpay_processing.php?id='.(int)$params['invoiceid'].'&url='.rawurlencode($return_url);
+    /** Create callback URL */
+    $callback_url = (isset($params['callback_url'])) ? ($params['callback_url']) : ($params['systemurl'] . 'modules/gateways/callback/' . $params['paymentmethod'] . '.php');
 
     /** Gateway request parameters array */
     $request = [
         "amount" => str_replace('.', '', $params['amount']),
-        "continue_url" => $return_url,
-        "cancel_url" => $return_url,
-        "callback_url" => (isset($params['callback_url'])) ? ($params['callback_url']) : ($params['systemurl'] . 'modules/gateways/callback/' . $params['paymentmethod'] . '.php'),
+        "continue_url" => $processing_url,
+        "cancel_url" => $processing_url,
+        "callback_url" => $callback_url,
         "customer_email" => $params['clientdetails']['email'],
         "payment_methods" => $params['payment_methods'],
         "language" => $params['language'],

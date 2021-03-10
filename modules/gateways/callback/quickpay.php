@@ -140,9 +140,6 @@ if ($checksum === $_SERVER["HTTP_QUICKPAY_CHECKSUM_SHA256"]) {
 
             if ('0' == $quickpay_transaction['paid']) {
                 if ($operation->type=='authorize') {
-                    /** Paid 1 on subscription parent record = authorized */
-                    full_query("UPDATE quickpay_transactions SET paid = '1' WHERE transaction_id = '" . (int)$transid . "'");
-
                     require_once __DIR__ . '/../../../modules/gateways/quickpay.php';
 
                     /** Payment link from response */
@@ -171,6 +168,9 @@ if ($checksum === $_SERVER["HTTP_QUICKPAY_CHECKSUM_SHA256"]) {
 
                     /** Trigger recurring payment */
                     helper_create_payment_link($transid/** Subscription ID */, $params, 'recurring');
+
+                    /** Paid 1 on subscription parent record = authorized */
+                    full_query("UPDATE quickpay_transactions SET paid = '1' WHERE transaction_id = '" . (int)$transid . "'");
                 } else {
                     /**  If recurring payment succeeded set transaction as paid */
                     full_query("UPDATE quickpay_transactions SET paid = '1' WHERE transaction_id = '" . (int)$transid . "'");

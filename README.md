@@ -48,3 +48,5 @@ Pull requests welcome!
  * Added "Refund" functionality for simple and recurring payments, can be triggered from Admin > Invoice screen.
  * Added "Custom Thank You Page" setup.
  * Fixed VAT calculation
+ * Fix redirect to unpaid invoice.
+ * Added processing page that pause the return url execution until the order is confirmed.
