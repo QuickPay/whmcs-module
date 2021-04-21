@@ -1,6 +1,6 @@
 <?php
 require __DIR__ . '/../../../init.php';
-echo "processing...";
+// echo "processing...";
 
 /* The number of checks allowed until done */
 const MAX_CHECKS = 5;
@@ -40,3 +40,4 @@ do {
 
 /* Redirect to return url */
 header("Location:".$redirect_url);
+exit();
