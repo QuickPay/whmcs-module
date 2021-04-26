@@ -51,3 +51,4 @@ Pull requests welcome!
  * Fix redirect to unpaid invoice.
  * Added processing page that pause the return url execution until the order is confirmed.
  * Removed "processing..." text from processing page
+ * Fix: Apply transaction payment after the "Payment fee" is added to invoice.

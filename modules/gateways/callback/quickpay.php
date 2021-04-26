@@ -93,11 +93,24 @@ if ($checksum === $_SERVER["HTTP_QUICKPAY_CHECKSUM_SHA256"]) {
             /** Admin username needed for api commands */
             $adminuser = $gateway['whmcs_adminname'];
 
+            /** Add the fee to Invoice */
+            if (0 < $fee) {
+                $values = [
+                    'invoiceid' => $invoiceid,
+                    'newitemdescription' => array("Payment fee"),
+                    'newitemamount' => array($fee),
+                    'newitemtaxed' => array("0")
+                ];
+
+                /** Update invoice request */
+                localAPI("updateinvoice", $values, $adminuser);
+            }
+
             /** Api request parameters */
             $values = [
                 'invoiceid' => $invoiceid,
                 'transid' => $transid,
-                'amount' => $tblinvoices['total'],
+                'amount' => $tblinvoices['total'] + $fee,
                 'fees' => $fee,
                 'gateway' => $gatewayModuleName
             ];
@@ -113,20 +126,7 @@ if ($checksum === $_SERVER["HTTP_QUICKPAY_CHECKSUM_SHA256"]) {
              * @param float $paymentFee      Payment fee (optional)
              * @param string $gatewayModule  Gateway module name
              */
-            localAPI("addinvoicepayment", $values, $adminuser);
-
-            /** Add the fee to Invoice */
-            if (0 < $fee) {
-                $values = [
-                    'invoiceid' => $invoiceid,
-                    'newitemdescription' => array("Payment fee"),
-                    'newitemamount' => array($fee),
-                    'newitemtaxed' => array("0")
-                ];
-
-                /** Update invoice request */
-                localAPI("updateinvoice", $values, $adminuser);
-            }
+            localAPI("addinvoicepayment", $values, $adminuser);  
         }
 
         /** Get recurring values of invoice parent order */
