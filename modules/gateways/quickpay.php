@@ -76,7 +76,7 @@ function quickpay_config()
         "quickpay_versionnumber" => [
             "FriendlyName" => "Installed module version",
             "Type" => null,
-            "Description" => "2.4.0",
+            "Description" => "2.4.1",
             "Size" => "20",
             "disabled" => true
         ],
@@ -220,7 +220,7 @@ function quickpay_refund($params)
 
     /** Get invoice data */
     $invoice = localAPI(/**command*/'GetInvoice', /**postData*/['invoiceid' => $params['invoiceid']]);
-      
+
     $request = [
         'id' => $params['transid'],
         'amount' => str_replace('.', '', $params['amount']),
@@ -454,8 +454,10 @@ function helper_create_payment_link($paymentId, $params, $type = 'payment')
 
     /** Create return page URL. If quickpay_custom_thankyou_url field is empty set return URL to default value */
     $return_url = (empty($params['quickpay_custom_thankyou_url'])) ? ($params['returnurl']) : ($params['systemurl'] . $params['quickpay_custom_thankyou_url']);
+
     /** Create processing page URL */
     $processing_url = $params['systemurl'] . 'modules/gateways/quickpay/quickpay_processing.php?id='.(int)$params['invoiceid'].'&url='.rawurlencode($return_url);
+
     /** Create callback URL */
     $callback_url = (isset($params['callback_url'])) ? ($params['callback_url']) : ($params['systemurl'] . 'modules/gateways/callback/' . $params['paymentmethod'] . '.php');
 
@@ -506,6 +508,8 @@ function helper_create_payment_link($paymentId, $params, $type = 'payment')
             $endpoint = sprintf('subscriptions/%s/link', $paymentId);
         }
 
+        logActivity('Quickpay request: ' . print_r($request, true));
+
         /** Payment link request */
         $paymentlink = helper_quickpay_request($apiKey, $endpoint, $request, 'PUT');
 
@@ -545,6 +549,7 @@ function helper_create_payment_link($paymentId, $params, $type = 'payment')
     } catch (\Exception $e) {
         /** DB operations fail */
         $pdo->rollBack();
+
         throw new Exception('Failed to create payment link, please try again later');
     }
 
@@ -588,6 +593,7 @@ function helper_quickpay_request_params($params)
     /** Cart Items Parameters */
     $request_arr['basket'] = [];
     $total_taxrate = quickpay_getTotalTaxRate($invoice);
+
     foreach ($invoice['items']['item'] as $item) {
         $item_price = (int) $item['amount'];
         $request_arr['basket'][] = [
@@ -712,6 +718,7 @@ function helper_update_table(PDO $pdo)
     } catch (\Exception $e) {
         /** Fail */
         $pdo->rollBack();
+
         logActivity('Error during quickpay table update: ' . $e->getMessage());
     }
 }
@@ -767,17 +774,32 @@ function helper_getInvoiceType($invoiceid)
  * @return float Total invoice taxrate
  */
 function quickpay_getTotalTaxRate($invoice){
-   $total = 0;
-   /** Calculate price of taxable items */
-   foreach ($invoice['items']['item'] as $item) {
-       if($item['taxed']==1){
-           $total += (float) $item['amount'];
-       }
-   }
-   $total = number_format( ((float) $total) , 2, '.', '');
-   $tax_1 = number_format( ((float) $invoice['tax']) , 2, '.', '');
-   $tax_2 = number_format( ((float) $invoice['tax2']) , 2, '.', '');
-   /** Add all taxes */
-   return number_format((($tax_1 + $tax_2) / $total ), 3);
+    $total = 0;
+
+    /** Calculate price of taxable items */
+    foreach ($invoice['items']['item'] as $item) {
+        if(1 == $item['taxed']){
+            $total += (float) $item['amount'];
+        }
+    }
+
+    $total = number_format( ((float) $total) , 2, '.', '');
+    $tax_1 = number_format( ((float) $invoice['tax']) , 2, '.', '');
+    $tax_2 = number_format( ((float) $invoice['tax2']) , 2, '.', '');
+
+    /** Add all taxes */
+    if (0 < $total) {
+        logActivity('quickpay_getTotalTaxRate AAA');
+        logActivity('quickpay_getTotalTaxRate total: ' . print_r($total, true));
+
+        $tax = ($total) ? (number_format((($tax_1 + $tax_2) / $total), 3)) : ((float) (0.000));
+    } else {
+        logActivity('quickpay_getTotalTaxRate BBB');
+        $tax = (float) 0.000;
+    }
+
+    logActivity('quickpay_getTotalTaxRate tax: ' . print_r($tax, true));
+
+   return $tax;
 }
 /************************** Utils functions END **************************/

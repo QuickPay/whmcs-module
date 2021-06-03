@@ -126,7 +126,7 @@ if ($checksum === $_SERVER["HTTP_QUICKPAY_CHECKSUM_SHA256"]) {
              * @param float $paymentFee      Payment fee (optional)
              * @param string $gatewayModule  Gateway module name
              */
-            localAPI("addinvoicepayment", $values, $adminuser);  
+            localAPI("addinvoicepayment", $values, $adminuser);
         }
 
         /** Get recurring values of invoice parent order */

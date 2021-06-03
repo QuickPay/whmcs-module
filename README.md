@@ -8,7 +8,9 @@ Based on existing integration but modified to use [payment links](https://learn.
 Pull requests welcome!
 
 ## Supported WHMCS versions
-* The plugin has been tested with WHMCS up to version 8.0.4
+* The plugin has been tested with:
+   - WHMCS up to version 8.1.3
+   - PHP up to version 7.3.28
 
 ## [Installation](https://learn.quickpay.net/helpdesk/en/articles/integrations/whmcs/)
 * Copy the content of the zip archive to the root of your WHMCS installation on your webserver.Preserve all folders, the files should end in the path /modules/gateways.
@@ -35,6 +37,8 @@ Pull requests welcome!
       - Example: custompages/thankyoupage.php
 
 ## Changelog
+#### 2.4.1:
+ * Fixed logic that calculated tax when tax is set to 0.
 #### 2.4.0:
  * Code refactoring;
  * Rebuild function that trigger "Create subscription" service to match requested parameters;
@@ -47,8 +51,4 @@ Pull requests welcome!
     - Automatic at expiration.
  * Added "Refund" functionality for simple and recurring payments, can be triggered from Admin > Invoice screen.
  * Added "Custom Thank You Page" setup.
- * Fixed VAT calculation
- * Fix redirect to unpaid invoice.
- * Added processing page that pause the return url execution until the order is confirmed.
- * Removed "processing..." text from processing page
  * Fix: Apply transaction payment after the "Payment fee" is added to invoice.
