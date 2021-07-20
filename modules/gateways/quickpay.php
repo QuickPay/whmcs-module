@@ -76,7 +76,7 @@ function quickpay_config()
         "quickpay_versionnumber" => [
             "FriendlyName" => "Installed module version",
             "Type" => null,
-            "Description" => "2.4.1",
+            "Description" => "2.4.2",
             "Size" => "20",
             "disabled" => true
         ],
