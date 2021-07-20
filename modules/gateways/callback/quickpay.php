@@ -37,6 +37,8 @@ if ($checksum === $_SERVER["HTTP_QUICKPAY_CHECKSUM_SHA256"]) {
     /** Decode response */
     $request = json_decode($requestBody);
 
+    logTransaction(/**gatewayName*/'quickpay', /**debugData*/['request' => print_r($request, true)], __FUNCTION__ . '::' . 'callback');
+
     $operation = end($request->operations);
     $orderType = $request->type;
     $operationType = $operation->type;
@@ -86,7 +88,7 @@ if ($checksum === $_SERVER["HTTP_QUICKPAY_CHECKSUM_SHA256"]) {
     checkCbTransID($transid);
 
     /** If request is accepted, authorized and qp status is ok*/
-    if ($request->accepted && (('authorize' == $operationType) || ('recurring' == $operationType)) && ("20000" == $operation->qp_status_code)) {
+    if ($request->accepted && (('authorize' == $operationType) || ('recurring' == $operationType) || ('capture' == $operationType)) && ("20000" == $operation->qp_status_code)) {
 
         /** Add transaction to Invoice */
         if ((("Subscription" == $orderType) && ('authorize' != $operationType)) || ("Subscription" != $orderType)) {
@@ -106,27 +108,52 @@ if ($checksum === $_SERVER["HTTP_QUICKPAY_CHECKSUM_SHA256"]) {
                 localAPI("updateinvoice", $values, $adminuser);
             }
 
-            /** Api request parameters */
-            $values = [
-                'invoiceid' => $invoiceid,
-                'transid' => $transid,
-                'amount' => $tblinvoices['total'] + $fee,
-                'fees' => $fee,
-                'gateway' => $gatewayModuleName
-            ];
+            if (
+                //  (('authorize' == $operationType) && ("Subscription" != $orderType)) ||
+                 ('recurring' == $operationType)
+                ) {
 
-            /**
-             * Add Invoice Payment.
-             *
-             * Applies a payment transaction entry to the given invoice ID.
-             *
-             * @param int $invoiceId         Invoice ID
-             * @param string $transactionId  Transaction ID
-             * @param float $paymentAmount   Amount paid (defaults to full balance)
-             * @param float $paymentFee      Payment fee (optional)
-             * @param string $gatewayModule  Gateway module name
-             */
-            localAPI("addinvoicepayment", $values, $adminuser);
+                logTransaction(/**gatewayName*/'quickpay', /**debugData*/['operationType' => print_r($operationType, true)], 'operationType');
+                logTransaction(/**gatewayName*/'quickpay', /**debugData*/['orderType' => print_r($orderType, true)], 'orderType');
+
+                $updateValues = [
+                    'invoiceid' => $invoiceid,
+                    'status' => "Payment Pending"
+                ];
+
+                /** Update invoice request */
+                localAPI("updateinvoice", $updateValues, $adminuser);
+            } else {
+                $updateValues = [
+                    'invoiceid' => $invoiceid,
+                    'status' => "Paid"
+                ];
+
+                /** Update invoice request */
+                localAPI("updateinvoice", $updateValues, $adminuser);
+
+                /** Api request parameters */
+                $values = [
+                    'invoiceid' => $invoiceid,
+                    'transid' => $transid,
+                    'amount' => $tblinvoices['total'] + $fee,
+                    'fees' => $fee,
+                    'gateway' => $gatewayModuleName
+                ];
+
+                /**
+                 * Add Invoice Payment.
+                 *
+                 * Applies a payment transaction entry to the given invoice ID.
+                 *
+                 * @param int $invoiceId         Invoice ID
+                 * @param string $transactionId  Transaction ID
+                 * @param float $paymentAmount   Amount paid (defaults to full balance)
+                 * @param float $paymentFee      Payment fee (optional)
+                 * @param string $gatewayModule  Gateway module name
+                 */
+                localAPI("addinvoicepayment", $values, $adminuser);
+            }
         }
 
         /** Get recurring values of invoice parent order */
@@ -160,7 +187,8 @@ if ($checksum === $_SERVER["HTTP_QUICKPAY_CHECKSUM_SHA256"]) {
                         "quickpay_google_analytics_client_id" => $gateway['quickpay_google_analytics_client_id'],
                         "apikey" => $gateway['apikey'],
                         "invoiceid" => $invoiceid,
-                        "prefix" => $gateway['prefix']
+                        "prefix" => $gateway['prefix'],
+                        "description" => $request->description
                     ];
 
                     /** SET subscription id in tblhosting if is empty, in order to enable autobiling and cancel methods*/
@@ -178,6 +206,15 @@ if ($checksum === $_SERVER["HTTP_QUICKPAY_CHECKSUM_SHA256"]) {
             }
             /** If Simple Payment */
         } else {
+            if ('recurring' == $operationType) {
+                $updateValues = [
+                    'status' => "Payment Pending"
+                ];
+
+                /** Update invoice request */
+                localAPI("updateinvoice", $updateValues, $adminuser);
+            }
+
             /** Mark payment in custom table as processed */
             full_query("UPDATE quickpay_transactions SET paid = '1' WHERE transaction_id = '" . (int)$transid . "'");
         }

@@ -37,6 +37,9 @@ Pull requests welcome!
       - Example: custompages/thankyoupage.php
 
 ## Changelog
+#### 2.4.2:
+ * Added support for MobilePay subscriptions
+ * Updated the payment flow of the subscriptions to use the "Payment Pending" state between "recurring" and "capture" operations
 #### 2.4.1:
  * Fixed logic that calculated tax when tax is set to 0.
 #### 2.4.0:

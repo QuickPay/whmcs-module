@@ -485,6 +485,9 @@ function helper_create_payment_link($paymentId, $params, $type = 'payment')
         /** Construt orderid string */
         $request["order_id"] = sprintf('%s%04d_r', $params['prefix'], $params['invoiceid']);
         $request["QuickPay-Callback-Url"] = $request['callback_url'];
+        /** Only for MobilePay subscription. */
+        $request["description"] = $params['description'];
+        $request["due_date"] = date("Y-m-d", strtotime('+24 hours'));
 
         /** Request endpoint */
         $endpoint = sprintf('subscriptions/%s/recurring', $paymentId/** Subscription_id */);
@@ -499,7 +502,7 @@ function helper_create_payment_link($paymentId, $params, $type = 'payment')
             throw new Exception('Failed to create recurring payment');
         }
 
-        logTransaction(/**gatewayName*/'quickpay', /**debugData*/['params' => $params], __FUNCTION__ . '::' . 'Recurring payment request complete');
+        logTransaction(/**gatewayName*/'quickpay', /**debugData*/['request' => $request], __FUNCTION__ . '::' . 'Recurring payment request complete');
     } else {
         /** Construt request endpoint URL based on payment type */
         $endpoint = sprintf('payments/%s/link', $paymentId);
@@ -620,6 +623,17 @@ function helper_quickpay_request_params($params)
  */
 function helper_quickpay_request($apikey = '', $endpoint = '', $params = [], $method = 'GET')
 {
+    logTransaction(
+        /*gatewayName*/'quickpay',
+        /*debugData*/[
+            'apikey' => print_r($apikey, true),
+            'endpoint' => $endpoint,
+            'params' => $params,
+            'method' => $method
+        ],
+        'requestBody'
+    );
+
     /** Endpoint URL */
     $url = 'https://api.quickpay.net/' . $endpoint;
 
@@ -631,8 +645,8 @@ function helper_quickpay_request($apikey = '', $endpoint = '', $params = [], $me
     ];
 
     /* Attach 'QuickPay-Callback-Url' request parameter to header request */
-    if(isset($params["QuickPay-Callback-Url"])){
-        array_push($headers, "QuickPay-Callback-Url:".$params["QuickPay-Callback-Url"]."");
+    if (isset($params["QuickPay-Callback-Url"])) {
+        array_push($headers, "QuickPay-Callback-Url:" . $params["QuickPay-Callback-Url"] . "");
     }
 
     /** Request parameters */
@@ -659,6 +673,8 @@ function helper_quickpay_request($apikey = '', $endpoint = '', $params = [], $me
 
     /** Close request */
     curl_close($ch);
+
+    logModuleCall(/*module*/'quickpay' . time(), $url, /*action*/($method . "::" . print_r($params, true)), /*responseData*/[$response], /*processedData*/[json_decode($response)], /*replaceVars*/[]);
 
     return json_decode($response);
 }
