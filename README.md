@@ -26,9 +26,6 @@ Pull requests welcome!
    - Agreement ID
    - Continue URL
    - Cancel URL
-   - Callback URL
-      - Should be on the form **http://www.yourserver.com/whmcs*/modules/gateways/callback/quickpay.php*
-         - replace *www.yourserver.com/whmcs* with the real path to your server.
    - The rest of the fields are optional
 * Press the **Save Changes** button
 * You are now ready to use QuickPay as payment provider, you must choose payment method for each group you create.
