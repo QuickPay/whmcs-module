@@ -31,6 +31,8 @@ $requestBody = file_get_contents("php://input");
  * originated from them. In the case of our example here, this is achieved by
  * way of a shared secret which is used to build and compare a hash.
  */
+
+ 
 $key = $gateway['private_key'];
 $checksum = hash_hmac("sha256", $requestBody, $key);
 if ($checksum === $_SERVER["HTTP_QUICKPAY_CHECKSUM_SHA256"]) {
@@ -44,10 +46,15 @@ if ($checksum === $_SERVER["HTTP_QUICKPAY_CHECKSUM_SHA256"]) {
     $operationType = $operation->type;
     $transid = $request->id;
     $invoiceid = $request->order_id;
-
+    
     /** Strip prefix if any*/
     if (isset($gateway['prefix'])) {
         $invoiceid = explode('_',substr($invoiceid, strlen($gateway['prefix'])))[0];
+    }
+    $invoiceid_arr = explode("-", $invoiceid);
+    if($invoiceid_arr[1] != NULL)
+    {
+        $invoiceid = $invoiceid_arr[0];
     }
 
     /** Convert amount to decimal type */
@@ -74,6 +81,7 @@ if ($checksum === $_SERVER["HTTP_QUICKPAY_CHECKSUM_SHA256"]) {
      * @param string $gatewayName Gateway Name
      */
     $invoiceid = checkCbInvoiceID($invoiceid, $gateway["name"]);
+    
 
     /**
      * Check Callback Transaction ID.
@@ -89,7 +97,6 @@ if ($checksum === $_SERVER["HTTP_QUICKPAY_CHECKSUM_SHA256"]) {
 
     /** If request is accepted, authorized and qp status is ok*/
     if ($request->accepted && (('authorize' == $operationType) || ('recurring' == $operationType) || ('capture' == $operationType)) && ("20000" == $operation->qp_status_code)) {
-
         /** Add transaction to Invoice */
         if ((("Subscription" == $orderType) && ('authorize' != $operationType)) || ("Subscription" != $orderType)) {
             /** Admin username needed for api commands */
@@ -103,11 +110,9 @@ if ($checksum === $_SERVER["HTTP_QUICKPAY_CHECKSUM_SHA256"]) {
                     'newitemamount' => array($fee),
                     'newitemtaxed' => array("0")
                 ];
-
                 /** Update invoice request */
                 localAPI("updateinvoice", $values, $adminuser);
             }
-
             if (
                 //  (('authorize' == $operationType) && ("Subscription" != $orderType)) ||
                  ('recurring' == $operationType)
@@ -169,35 +174,60 @@ if ($checksum === $_SERVER["HTTP_QUICKPAY_CHECKSUM_SHA256"]) {
                 if ($operation->type=='authorize') {
                     require_once __DIR__ . '/../../../modules/gateways/quickpay.php';
 
-                    /** Payment link from response */
-                    $linkArray = json_decode(json_encode($request->link), true);
+                    /** Check if the request is a card change request */
+                    if($_GET['isUpdate'] == "0")
+                    {
+                         /** SET subscription id in tblhosting if is empty, in order to enable autobiling and cancel methods*/
+                        update_query("tblhosting", ["subscriptionid" => $transid], ["id" => $recurringData['primaryserviceid'], "subscriptionid" => '']);
 
-                    /** Recurring payment parameters */
-                    $params = [
-                        "amount" => number_format(($linkArray['amount']/100.0), 2, '.', ''), /** Convert amount to decimal */
-                        "returnurl" => $linkArray['continue_url'],
-                        "callback_url" => $linkArray['callback_url'],
-                        "clientdetails" => ['email' => $linkArray['customer_email']],
-                        "payment_methods" => $linkArray['payment_methods'],
-                        "language" => $linkArray['language'],
-                        "autocapture" => $gateway['autocapture'],
-                        "autofee" => $gateway['autofee'],
-                        "quickpay_branding_id" => $gateway['quickpay_branding_id'],
-                        "quickpay_google_analytics_tracking_id" => $gateway['quickpay_google_analytics_tracking_id'],
-                        "quickpay_google_analytics_client_id" => $gateway['quickpay_google_analytics_client_id'],
-                        "apikey" => $gateway['apikey'],
-                        "invoiceid" => $invoiceid,
-                        "prefix" => $gateway['prefix'],
-                        "description" => $request->description
-                    ];
+                        
+                            /** Payment link from response */
+                        $linkArray = json_decode(json_encode($request->link), true);
 
-                    /** SET subscription id in tblhosting if is empty, in order to enable autobiling and cancel methods*/
-                    update_query("tblhosting", ["subscriptionid" => $transid], ["id" => $recurringData['primaryserviceid'], "subscriptionid" => '']);
+                            /** Recurring payment parameters */
+                        $params = [
+                                "amount" => number_format(($linkArray['amount']/100.0), 2, '.', ''), /** Convert amount to decimal */
+                                "returnurl" => $linkArray['continue_url'],
+                                "callback_url" => $linkArray['callback_url'],
+                                "clientdetails" => ['email' => $linkArray['customer_email']],
+                                "payment_methods" => $linkArray['payment_methods'],
+                                "language" => $linkArray['language'],
+                                "autocapture" => $gateway['autocapture'],
+                                "autofee" => $gateway['autofee'],
+                                "quickpay_branding_id" => $gateway['quickpay_branding_id'],
+                                "quickpay_google_analytics_tracking_id" => $gateway['quickpay_google_analytics_tracking_id'],
+                                "quickpay_google_analytics_client_id" => $gateway['quickpay_google_analytics_client_id'],
+                                "apikey" => $gateway['apikey'],
+                                "invoiceid" => $invoiceid,
+                                "prefix" => $gateway['prefix'],
+                                "description" => $request->description
+                            ];
 
-                    /** Trigger recurring payment */
-                    helper_create_payment_link($transid/** Subscription ID */, $params, 'recurring');
+                            /** Trigger recurring payment */
+                        helper_create_payment_link($transid/** Subscription ID */, $params, 'recurring');
+
+                    }
+                    else
+                    {
+                        if($_GET['isUpdate'] == "1")
+                        {
+                            /** Get the old subscription id */
+                            $result = select_query("tblhosting", "id, subscriptionid", ["id" => $recurringData['primaryserviceid']]);
+                            $data = mysql_fetch_array($result);  
+                            $params = [
+                                'subscriptionID' => $data['subscriptionid'],
+                                'apikey' => $gateway['apikey']];
+
+                            /** Cancel the subscripition */
+                            quickpay_cancelSubscription($params);
+                            /** Update the subscription id */
+                            update_query("tblhosting", ["subscriptionid" => $transid], ["id" => $recurringData['primaryserviceid']]);
+
+                        }
+                    }
 
                     /** Paid 1 on subscription parent record = authorized */
+
                     full_query("UPDATE quickpay_transactions SET paid = '1' WHERE transaction_id = '" . (int)$transid . "'");
                 } else {
                     /**  If recurring payment succeeded set transaction as paid */

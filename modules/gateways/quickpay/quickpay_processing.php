@@ -1,6 +1,5 @@
 <?php
 require __DIR__ . '/../../../init.php';
-// echo "processing...";
 
 /* The number of checks allowed until done */
 const MAX_CHECKS = 5;
@@ -8,6 +7,7 @@ const MAX_CHECKS = 5;
 const DELAY = 1;
 
 /* GET params */
+
 $invoice_id = (int) $whmcs->get_req_var("id");
 $redirect_url = rawurldecode($whmcs->get_req_var("url"));
 /* If invoice id or redirect url are empty, redirect to root */
@@ -39,5 +39,5 @@ do {
 } while ('0' == $quickpay_transaction['paid'] && $checks > 0);
 
 /* Redirect to return url */
-header("Location:".$redirect_url);
+header("Location: ".$redirect_url);
 exit();

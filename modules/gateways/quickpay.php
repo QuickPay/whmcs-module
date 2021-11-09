@@ -22,6 +22,7 @@
 use Illuminate\Database\Capsule\Manager as Capsule;
 
 require_once 'quickpay/quickpay_countries.php';
+include 'quickpay/quickpay_clientareahook.php';
 
 if (!defined("WHMCS")) {
     die("This file cannot be accessed directly");
@@ -37,6 +38,8 @@ if (!defined("WHMCS")) {
  *
  * @return array
  */
+
+
 function quickpay_MetaData()
 {
     return [
@@ -276,11 +279,15 @@ function quickpay_cancelSubscription($params)
 {
     logTransaction(/**gatewayName*/'quickpay', /**debugData*/['params' => $params], __FUNCTION__ . '::' . 'Cancel subscription request received');
 
+
     /** Gateway request parameters */
     $request = ['id' => $params['subscriptionID']];
 
+
+
     /** Gateway cancel request */
     $response = helper_quickpay_request($params['apikey'], sprintf('subscriptions/%s/cancel', $params['subscriptionID']), $request, 'POST');
+
 
     /** Fail due to a connection issue */
     if (!isset($response)) {
@@ -406,7 +413,6 @@ function helper_create_subscription($params)
         $data = mysql_fetch_array($result);
         $activeSubscriptionId = $data['subscriptionid'];
     }
-
     /** Check if active subscription */
     if (isset($activeSubscriptionId) && !empty($activeSubscriptionId)) {
         /** Do subscription recurring payment - null payment link expected*/
@@ -435,6 +441,174 @@ function helper_create_subscription($params)
     return $paymentLink;
 }
 
+/** Update the subscription if the users requests to change card
+ * Subscription payment method update
+ * 
+ * @param array 
+ *
+ * @return string - the new payment link
+ */
+
+function helper_update_subscription($params)
+{
+    /** Get the old subscription */
+    $oldSubscription = helper_quickpay_request($params['apikey'], sprintf('subscriptions/%s', $params['subscriptionid']), NULL, 'GET');
+
+    /** Get invoice id associated with the old subscription */
+    $result = select_query("quickpay_transactions", "invoice_id" , ["transaction_id" => $oldSubscription->id]);
+    $data = mysql_fetch_array($result);
+    $invoice_id = $data['invoice_id'];
+
+    /** Get all transactions associated with the invoice id */
+    $result = select_query("quickpay_transactions", "transaction_id, payment_link", ["invoice_id" => $invoice_id], "id DESC");
+    $transaction_id = 0;
+    while($data = mysql_fetch_array($result)){
+        
+        if(!empty($data['payment_link']))
+        {
+            /** Get the latest subscription id associated with the invoice id */
+            $transaction_id = $data['transaction_id'];
+            break;
+        }
+    }
+
+    if($oldSubscription->id != $transaction_id)
+    {
+        /** The subscription associated with the in the tblhosting is not the latest so overwrite it */
+        $oldSubscription = helper_quickpay_request($params['apikey'], sprintf('subscriptions/%s', $transaction_id), NULL, 'GET');
+    }
+
+    if($oldSubscription->id == NULL){
+        throw new Exception('Failed to change payment method, please try again later'); 
+    }
+    /** Update order id, so it is unique */
+    $order_id_arr = explode("-", $oldSubscription->order_id);
+    if ($order_id_arr[1] !=NULL)
+    {
+        $oldSubscription->order_id = $order_id_arr[0] . '-'.  strval(((int)$order_id_arr[1])+1);
+    }
+    else
+    {
+        $oldSubscription->order_id .=  '-2';
+    }
+
+    /** Construct the Subscripion Parmeters */
+    $newRequest = [
+        'currency' => $oldSubscription->currency,
+        'order_id' => $oldSubscription->order_id,
+        'description' => $oldSubscription->description,
+        'branding_id' => $oldSubscription->branding_id
+    ];
+    
+
+    /** Construct the Invoice Parameters */
+    $newRequest['invoice_address'] = [
+        'name' =>  $oldSubscription->name,
+        'company_name' => $oldSubscription->company_name,
+        'street' => $oldSubscription->street,
+        'city' => $oldSubscription->city,
+        'zip_code' => $oldSubscription->zip_code,
+        'region' => $oldSubscription->region,
+        'country_code' => $oldSubscription->country_code,
+        'phone_number' => $oldSubscription->phone_number,
+        'email' =>  $oldSubscription->email
+    ];
+
+
+    /** Extract the invoice items details. */
+    $invoice = localAPI(/**command*/'GetInvoice', /**postData*/['invoiceid' => $invoice_id]);
+
+    /** Cart Items Parameters */
+    $newRequest['basket'] = [];
+    $total_taxrate = quickpay_getTotalTaxRate($invoice);
+    
+    foreach ($invoice['items']['item'] as $item) {
+         $item_price = (int) $item['amount'];
+         $request_arr['basket'][] = [
+             'qty' => 1,
+             'item_no' => (string)$item['id'],
+             'item_name' => $item['description'],
+             'item_price' => (int) $item['amount'],
+             'vat_rate' => $item['taxed']==1?$total_taxrate:'0'
+            ];
+        }
+        
+
+    /** Create the new subscription */
+    $newSubscription = helper_quickpay_request($params['apikey'], '/subscriptions', $newRequest, 'POST'); 
+
+    /** Create the new request for the payment link generation */
+    $processing_url = $params['continue_url']."&updatedId=".$newSubscription->id;
+    $callback_url = '';
+
+    if(!str_contains($oldSubscription->link->callback_url,"?isUpdate="))
+    {
+        $callback_url = $oldSubscription->link->callback_url . "?isUpdate=1";
+    }
+    else
+    {
+        $callback_url = str_replace("?isUpdate=0","?isUpdate=1",$oldSubscription->link->callback_url);
+    }
+
+    $request = [
+        "amount" => $oldSubscription->link->amount,
+        "continue_url" => $processing_url,
+        "payment_methods" => $oldSubscription->link->payment_methods,
+        "continue_url" => $processing_url,
+        "cancel_url" => $processing_url,
+        "callback_url" => $callback_url,
+        "autofee" => $oldSubscription->link->auto_fee,
+        "branding_id" =>  $oldSubscription->link->branding_id,
+        "google_analytics_tracking_id" =>  $oldSubscription->link->google_analytics_tracking_id,
+        "google_analytics_client_id" =>  $oldSubscription->link->google_analytics_client_id,
+        "acquirer" =>  $oldSubscription->link->acquirer,    
+        "deadline" => $oldSubscription->link->deadline,
+        "framed" => $oldSubscription->link->framed,
+        "branding_config" => $oldSubscription->link->branding_config,
+        "customer_email" => $oldSubscription->link->customer_email,
+        "invoice_address_selection" => $oldSubscription->link->invoice_address_selection,
+        "shipping_address_selection" => $oldSubscription->link->shipping_address_selection
+    ];
+
+    /** Get the payment link */
+    $payment_link = helper_quickpay_request($params['apikey'], sprintf('subscriptions/%s/link', $newSubscription->id), $request, 'PUT');
+
+    /** Save transaction data to custom table */
+    $pdo = Capsule::connection()->getPdo();
+    $pdo->beginTransaction();
+
+    try {
+        
+        /** Replace old payment link if one already exists */
+
+        $pdo->prepare(
+            'DELETE FROM quickpay_transactions WHERE transaction_id = :transaction_id AND paid != 1'
+        )->execute([
+            ':transaction_id' => $newSubscription->id,
+        ]);
+
+
+        /** Insert operation */
+        $statement = $pdo->prepare(
+            'INSERT INTO quickpay_transactions (invoice_id, transaction_id, payment_link, amount, paid) VALUES (:invoice_id, :transaction_id, :payment_link, :amount, 0)'
+        )->execute([
+            ':invoice_id' => $invoice_id,
+            ':transaction_id' => $newSubscription->id,
+            ':payment_link' => $payment_link->url,
+            ':amount' =>  number_format(($oldSubscription->link->amount/100.0), 2, '.', '')
+        ]);
+
+        $pdo->commit();
+    } catch (\Exception $e) {
+        /** DB operations fail */
+        $pdo->rollBack();
+
+        throw new Exception('Failed to create payment link, please try again later');
+    }    
+
+    return $payment_link;
+}
+
 /**
  * Create payment link
  *
@@ -459,7 +633,7 @@ function helper_create_payment_link($paymentId, $params, $type = 'payment')
     $processing_url = $params['systemurl'] . 'modules/gateways/quickpay/quickpay_processing.php?id='.(int)$params['invoiceid'].'&url='.rawurlencode($return_url);
 
     /** Create callback URL */
-    $callback_url = (isset($params['callback_url'])) ? ($params['callback_url']) : ($params['systemurl'] . 'modules/gateways/callback/' . $params['paymentmethod'] . '.php');
+    $callback_url = (isset($params['callback_url'])) ? ($params['callback_url']) : ($params['systemurl'] . 'modules/gateways/callback/' . $params['paymentmethod'] . '.php?isUpdate=0');
 
     /** Gateway request parameters array */
     $request = [
@@ -532,6 +706,7 @@ function helper_create_payment_link($paymentId, $params, $type = 'payment')
 
     try {
         /** Replace old payment link if one already exists */
+
         $pdo->prepare(
             'DELETE FROM quickpay_transactions WHERE transaction_id = :transaction_id AND paid != 1'
         )->execute([
@@ -576,6 +751,7 @@ function helper_quickpay_request_params($params)
         'description' => $params['description'],
         'branding_id' => $params['quickpay_branding_id']
     ];
+    
 
     /** Invoice Parameters */
     $request_arr['invoice_address'] = [
