@@ -34,6 +34,8 @@ Pull requests welcome!
       - Example: custompages/thankyoupage.php
 
 ## Changelog
+#### 2.4.3:
+ * Added support for card details update on subscription products
 #### 2.4.2:
  * Added support for MobilePay subscriptions
  * Updated the payment flow of the subscriptions to use the "Payment Pending" state between "recurring" and "capture" operations

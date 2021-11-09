@@ -79,7 +79,7 @@ function quickpay_config()
         "quickpay_versionnumber" => [
             "FriendlyName" => "Installed module version",
             "Type" => null,
-            "Description" => "2.4.2",
+            "Description" => "2.4.3",
             "Size" => "20",
             "disabled" => true
         ],
@@ -443,8 +443,8 @@ function helper_create_subscription($params)
 
 /** Update the subscription if the users requests to change card
  * Subscription payment method update
- * 
- * @param array 
+ *
+ * @param array
  *
  * @return string - the new payment link
  */
@@ -463,7 +463,7 @@ function helper_update_subscription($params)
     $result = select_query("quickpay_transactions", "transaction_id, payment_link", ["invoice_id" => $invoice_id], "id DESC");
     $transaction_id = 0;
     while($data = mysql_fetch_array($result)){
-        
+
         if(!empty($data['payment_link']))
         {
             /** Get the latest subscription id associated with the invoice id */
@@ -479,7 +479,7 @@ function helper_update_subscription($params)
     }
 
     if($oldSubscription->id == NULL){
-        throw new Exception('Failed to change payment method, please try again later'); 
+        throw new Exception('Failed to change payment method, please try again later');
     }
     /** Update order id, so it is unique */
     $order_id_arr = explode("-", $oldSubscription->order_id);
@@ -499,7 +499,7 @@ function helper_update_subscription($params)
         'description' => $oldSubscription->description,
         'branding_id' => $oldSubscription->branding_id
     ];
-    
+
 
     /** Construct the Invoice Parameters */
     $newRequest['invoice_address'] = [
@@ -521,7 +521,7 @@ function helper_update_subscription($params)
     /** Cart Items Parameters */
     $newRequest['basket'] = [];
     $total_taxrate = quickpay_getTotalTaxRate($invoice);
-    
+
     foreach ($invoice['items']['item'] as $item) {
          $item_price = (int) $item['amount'];
          $request_arr['basket'][] = [
@@ -532,10 +532,10 @@ function helper_update_subscription($params)
              'vat_rate' => $item['taxed']==1?$total_taxrate:'0'
             ];
         }
-        
+
 
     /** Create the new subscription */
-    $newSubscription = helper_quickpay_request($params['apikey'], '/subscriptions', $newRequest, 'POST'); 
+    $newSubscription = helper_quickpay_request($params['apikey'], '/subscriptions', $newRequest, 'POST');
 
     /** Create the new request for the payment link generation */
     $processing_url = $params['continue_url']."&updatedId=".$newSubscription->id;
@@ -561,7 +561,7 @@ function helper_update_subscription($params)
         "branding_id" =>  $oldSubscription->link->branding_id,
         "google_analytics_tracking_id" =>  $oldSubscription->link->google_analytics_tracking_id,
         "google_analytics_client_id" =>  $oldSubscription->link->google_analytics_client_id,
-        "acquirer" =>  $oldSubscription->link->acquirer,    
+        "acquirer" =>  $oldSubscription->link->acquirer,
         "deadline" => $oldSubscription->link->deadline,
         "framed" => $oldSubscription->link->framed,
         "branding_config" => $oldSubscription->link->branding_config,
@@ -578,7 +578,7 @@ function helper_update_subscription($params)
     $pdo->beginTransaction();
 
     try {
-        
+
         /** Replace old payment link if one already exists */
 
         $pdo->prepare(
@@ -604,7 +604,7 @@ function helper_update_subscription($params)
         $pdo->rollBack();
 
         throw new Exception('Failed to create payment link, please try again later');
-    }    
+    }
 
     return $payment_link;
 }
@@ -751,7 +751,7 @@ function helper_quickpay_request_params($params)
         'description' => $params['description'],
         'branding_id' => $params['quickpay_branding_id']
     ];
-    
+
 
     /** Invoice Parameters */
     $request_arr['invoice_address'] = [
