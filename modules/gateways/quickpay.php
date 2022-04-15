@@ -79,7 +79,7 @@ function quickpay_config()
         "quickpay_versionnumber" => [
             "FriendlyName" => "Installed module version",
             "Type" => null,
-            "Description" => "2.4.3",
+            "Description" => "2.4.4",
             "Size" => "20",
             "disabled" => true
         ],
@@ -993,5 +993,20 @@ function quickpay_getTotalTaxRate($invoice){
     logActivity('quickpay_getTotalTaxRate tax: ' . print_r($tax, true));
 
    return $tax;
+}
+
+/**
+ * Get order id from tblhosting table
+ *
+ * @param array $hostingId The product/service hosting ID
+ *
+ * @return array
+ */
+function helper_get_order_id($hostingId){
+    /** Extract order ID from tblhosting table. */
+    $result = select_query("tblhosting", "id, orderid", ["id" => $hostingId]);
+
+    /** Return selected data: "orderid".  */
+    return mysql_fetch_array($result);
 }
 /************************** Utils functions END **************************/

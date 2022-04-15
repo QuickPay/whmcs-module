@@ -34,6 +34,10 @@ Pull requests welcome!
       - Example: custompages/thankyoupage.php
 
 ## Changelog
+#### 2.4.4:
+ * Fixed some issues
+   - Date paid not show on invoice summary in admin panel
+   - The order status not set as 'Active' if the order was already paid
 #### 2.4.3:
  * Added support for card details update on subscription products
 #### 2.4.2:

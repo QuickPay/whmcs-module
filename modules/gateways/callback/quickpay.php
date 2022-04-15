@@ -32,7 +32,7 @@ $requestBody = file_get_contents("php://input");
  * way of a shared secret which is used to build and compare a hash.
  */
 
- 
+
 $key = $gateway['private_key'];
 $checksum = hash_hmac("sha256", $requestBody, $key);
 if ($checksum === $_SERVER["HTTP_QUICKPAY_CHECKSUM_SHA256"]) {
@@ -41,12 +41,18 @@ if ($checksum === $_SERVER["HTTP_QUICKPAY_CHECKSUM_SHA256"]) {
 
     logTransaction(/**gatewayName*/'quickpay', /**debugData*/['request' => print_r($request, true)], __FUNCTION__ . '::' . 'callback');
 
+    /**
+     * Get last operation from request
+     * Save variables with operation type and status code.
+     */
     $operation = end($request->operations);
-    $orderType = $request->type;
     $operationType = $operation->type;
+    $qpStatusCode = $operation->qp_status_code;
+
+    $orderType = $request->type;
     $transid = $request->id;
     $invoiceid = $request->order_id;
-    
+
     /** Strip prefix if any*/
     if (isset($gateway['prefix'])) {
         $invoiceid = explode('_',substr($invoiceid, strlen($gateway['prefix'])))[0];
@@ -70,24 +76,24 @@ if ($checksum === $_SERVER["HTTP_QUICKPAY_CHECKSUM_SHA256"]) {
     /**
      * Validate Callback Invoice ID.
      *
-     * Checks invoice ID is a valid invoice number. Note it will count an
-     * invoice in any status as valid.
+     * Checks invoice ID is a valid invoice number.
+     * NOTE: it will count an invoice in any status as valid.
      *
      * Performs a die upon encountering an invalid Invoice ID.
      *
-     * Returns a normalised invoice ID.
+     * Returns a normalized invoice ID.
      *
      * @param int $invoiceId Invoice ID
      * @param string $gatewayName Gateway Name
      */
     $invoiceid = checkCbInvoiceID($invoiceid, $gateway["name"]);
-    
+
 
     /**
      * Check Callback Transaction ID.
      *
-     * Performs a check for any existing transactions with the same given
-     * transaction number.
+     * Performs a check for any existing transactions
+     * with the same given transaction number.
      *
      * Performs a die upon encountering a duplicate.
      *
@@ -96,7 +102,7 @@ if ($checksum === $_SERVER["HTTP_QUICKPAY_CHECKSUM_SHA256"]) {
     checkCbTransID($transid);
 
     /** If request is accepted, authorized and qp status is ok*/
-    if ($request->accepted && (('authorize' == $operationType) || ('recurring' == $operationType) || ('capture' == $operationType)) && ("20000" == $operation->qp_status_code)) {
+    if ($request->accepted && in_array($operationType, ['authorize', 'capture', 'recurring']) && ("20000" == $qpStatusCode)) {
         /** Add transaction to Invoice */
         if ((("Subscription" == $orderType) && ('authorize' != $operationType)) || ("Subscription" != $orderType)) {
             /** Admin username needed for api commands */
@@ -113,6 +119,7 @@ if ($checksum === $_SERVER["HTTP_QUICKPAY_CHECKSUM_SHA256"]) {
                 /** Update invoice request */
                 localAPI("updateinvoice", $values, $adminuser);
             }
+
             if (
                 //  (('authorize' == $operationType) && ("Subscription" != $orderType)) ||
                  ('recurring' == $operationType)
@@ -129,33 +136,28 @@ if ($checksum === $_SERVER["HTTP_QUICKPAY_CHECKSUM_SHA256"]) {
                 /** Update invoice request */
                 localAPI("updateinvoice", $updateValues, $adminuser);
             } else {
-                $updateValues = [
-                    'invoiceid' => $invoiceid,
-                    'status' => "Paid"
-                ];
-
-                /** Update invoice request */
-                localAPI("updateinvoice", $updateValues, $adminuser);
-
                 /** Api request parameters */
                 $values = [
                     'invoiceid' => $invoiceid,
                     'transid' => $transid,
                     'amount' => $tblinvoices['total'] + $fee,
                     'fees' => $fee,
-                    'gateway' => $gatewayModuleName
+                    'gateway' => $gatewayModuleName,
+                    'date' => date("Y-m-d H:i:s"),
                 ];
 
                 /**
                  * Add Invoice Payment.
                  *
                  * Applies a payment transaction entry to the given invoice ID.
+                 * This also modify invoice status to "Paid" and add date in "datepaid" column
                  *
                  * @param int $invoiceId         Invoice ID
                  * @param string $transactionId  Transaction ID
                  * @param float $paymentAmount   Amount paid (defaults to full balance)
                  * @param float $paymentFee      Payment fee (optional)
                  * @param string $gatewayModule  Gateway module name
+                 * @param string $date           Current date
                  */
                 localAPI("addinvoicepayment", $values, $adminuser);
             }
@@ -170,8 +172,9 @@ if ($checksum === $_SERVER["HTTP_QUICKPAY_CHECKSUM_SHA256"]) {
             $query_quickpay_transaction = select_query("quickpay_transactions", "transaction_id,paid", ["transaction_id" => (int)$transid]);
             $quickpay_transaction = mysql_fetch_array($query_quickpay_transaction);
 
+            /** If not Paid. */
             if ('0' == $quickpay_transaction['paid']) {
-                if ($operation->type=='authorize') {
+                if ('authorize' == $operationType) {
                     require_once __DIR__ . '/../../../modules/gateways/quickpay.php';
 
                     /** Check if the request is a card change request */
@@ -180,7 +183,7 @@ if ($checksum === $_SERVER["HTTP_QUICKPAY_CHECKSUM_SHA256"]) {
                          /** SET subscription id in tblhosting if is empty, in order to enable autobiling and cancel methods*/
                         update_query("tblhosting", ["subscriptionid" => $transid], ["id" => $recurringData['primaryserviceid'], "subscriptionid" => '']);
 
-                        
+
                             /** Payment link from response */
                         $linkArray = json_decode(json_encode($request->link), true);
 
@@ -206,6 +209,11 @@ if ($checksum === $_SERVER["HTTP_QUICKPAY_CHECKSUM_SHA256"]) {
                             /** Trigger recurring payment */
                         helper_create_payment_link($transid/** Subscription ID */, $params, 'recurring');
 
+                        /**
+                         * Get order ID & accept order (set status=Active)
+                         */
+                        $orderData = helper_get_order_id(/*Hosting id*/ $recurringData['primaryserviceid']);
+                        localAPI('AcceptOrder', $orderData, $adminuser);
                     }
                     else
                     {
@@ -213,7 +221,7 @@ if ($checksum === $_SERVER["HTTP_QUICKPAY_CHECKSUM_SHA256"]) {
                         {
                             /** Get the old subscription id */
                             $result = select_query("tblhosting", "id, subscriptionid", ["id" => $recurringData['primaryserviceid']]);
-                            $data = mysql_fetch_array($result);  
+                            $data = mysql_fetch_array($result);
                             $params = [
                                 'subscriptionID' => $data['subscriptionid'],
                                 'apikey' => $gateway['apikey']];
@@ -226,15 +234,16 @@ if ($checksum === $_SERVER["HTTP_QUICKPAY_CHECKSUM_SHA256"]) {
                         }
                     }
 
-                    /** Paid 1 on subscription parent record = authorized */
-
+                    /**
+                     * !!! Paid 1 on subscription parent record = authorized !!!
+                     */
                     full_query("UPDATE quickpay_transactions SET paid = '1' WHERE transaction_id = '" . (int)$transid . "'");
                 } else {
                     /**  If recurring payment succeeded set transaction as paid */
                     full_query("UPDATE quickpay_transactions SET paid = '1' WHERE transaction_id = '" . (int)$transid . "'");
                 }
             }
-            /** If Simple Payment */
+        /** If Simple Payment */
         } else {
             if ('recurring' == $operationType) {
                 $updateValues = [
