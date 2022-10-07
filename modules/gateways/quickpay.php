@@ -163,8 +163,7 @@ function quickpay_config()
         "link_text" => [
             "FriendlyName" => "Pay now text",
             "Type" => "text",
-            "Value" =>
-            "Pay Now",
+            "Value" => "Pay Now",
             "Size" => "60"
         ],
     ];
@@ -355,7 +354,7 @@ function helper_get_payment($params)
 
     /** If payment | subscription doesn't exist, create it */
     if ('subscription' === $payment_type) {
-        $paymentlink = helper_create_subscription($params);
+            $paymentlink = helper_create_subscription($params);
     } else {
         $paymentlink = helper_create_payment($params);
     }
@@ -414,7 +413,7 @@ function helper_create_subscription($params)
         $activeSubscriptionId = $data['subscriptionid'];
     }
     /** Check if active subscription */
-    if (isset($activeSubscriptionId) && !empty($activeSubscriptionId)) {
+    if (!empty($activeSubscriptionId)) {
         /** Do subscription recurring payment - null payment link expected*/
         $paymentLink = helper_create_payment_link($activeSubscriptionId, $params, 'recurring');
     } else {
@@ -630,10 +629,10 @@ function helper_create_payment_link($paymentId, $params, $type = 'payment')
     $return_url = (empty($params['quickpay_custom_thankyou_url'])) ? ($params['returnurl']) : ($params['systemurl'] . $params['quickpay_custom_thankyou_url']);
 
     /** Create processing page URL */
-    $processing_url = $params['systemurl'] . 'modules/gateways/quickpay/quickpay_processing.php?id='.(int)$params['invoiceid'].'&url='.rawurlencode($return_url);
+    $processing_url = $params['systemurl'] . 'modules/gateways/quickpay/quickpay_processing.php?id=' . (int)$params['invoiceid'] . '&url=' . rawurlencode($return_url);
 
     /** Create callback URL */
-    $callback_url = (isset($params['callback_url'])) ? ($params['callback_url']) : ($params['systemurl'] . 'modules/gateways/callback/' . $params['paymentmethod'] . '.php?isUpdate=0');
+    $callback_url = $params['callback_url'] ?? ($params['systemurl'] . 'modules/gateways/callback/' . $params['paymentmethod'] . '.php?isUpdate=0');
 
     /** Gateway request parameters array */
     $request = [
@@ -719,7 +718,7 @@ function helper_create_payment_link($paymentId, $params, $type = 'payment')
         )->execute([
             ':invoice_id' => $params['invoiceid'],
             ':transaction_id' => $paymentId,
-            ':payment_link' => (isset($paymentlink->url)) ? ($paymentlink->url) : (''),
+            ':payment_link' => $paymentlink->url ?? '',
             ':amount' => $params['amount']
         ]);
 
@@ -732,7 +731,7 @@ function helper_create_payment_link($paymentId, $params, $type = 'payment')
     }
 
     /** Return payment link if payment or subscription and null if recurring payment */
-    return (isset($paymentlink->url)) ? ($paymentlink->url) : (null);
+    return $paymentlink->url ?? null;
 }
 
 /**
@@ -747,7 +746,7 @@ function helper_quickpay_request_params($params)
     /** Order Parameters */
     $request_arr = [
         'currency' => $params['currency'],
-        'order_id' => sprintf('%s%04d%s', $params['prefix'], $params['invoiceid'], (isset($params['suffix']) ? $params['suffix'] : '')),
+        'order_id' => sprintf('%s%04d%s', $params['prefix'], $params['invoiceid'], ($params['suffix'] ?? '')),
         'description' => $params['description'],
         'branding_id' => $params['quickpay_branding_id']
     ];

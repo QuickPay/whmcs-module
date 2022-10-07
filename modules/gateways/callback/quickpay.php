@@ -6,6 +6,10 @@
  */
 
 /** Require libraries needed for gateway module functions. */
+use WHMCS\Database\Capsule;
+use WHMCS\Billing\Invoice;
+use WHMCS\Order\Order;
+
 require_once __DIR__ . '/../../../init.php';
 require_once __DIR__ . '/../../../includes/gatewayfunctions.php';
 require_once __DIR__ . '/../../../includes/invoicefunctions.php';
@@ -31,10 +35,9 @@ $requestBody = file_get_contents("php://input");
  * originated from them. In the case of our example here, this is achieved by
  * way of a shared secret which is used to build and compare a hash.
  */
-
-
 $key = $gateway['private_key'];
 $checksum = hash_hmac("sha256", $requestBody, $key);
+
 if ($checksum === $_SERVER["HTTP_QUICKPAY_CHECKSUM_SHA256"]) {
     /** Decode response */
     $request = json_decode($requestBody);
@@ -57,7 +60,9 @@ if ($checksum === $_SERVER["HTTP_QUICKPAY_CHECKSUM_SHA256"]) {
     if (isset($gateway['prefix'])) {
         $invoiceid = explode('_',substr($invoiceid, strlen($gateway['prefix'])))[0];
     }
+
     $invoiceid_arr = explode("-", $invoiceid);
+
     if($invoiceid_arr[1] != NULL)
     {
         $invoiceid = $invoiceid_arr[0];
@@ -66,12 +71,11 @@ if ($checksum === $_SERVER["HTTP_QUICKPAY_CHECKSUM_SHA256"]) {
     /** Convert amount to decimal type */
     $amount = ($operation->amount / 100.0);
 
-    /** In order to find any added fee, we must find the original order amount in the database */
-    $tblinvoices_query = select_query("tblinvoices", "id,total", array("id" => $invoiceid));
-    $tblinvoices = mysql_fetch_array($tblinvoices_query);
+    /** Get invoice data */
+    $invoice = localAPI(/**command*/'GetInvoice', /**postData*/['invoiceid' => $invoiceid]);
 
     /* Calculate the fee */
-    $fee = $amount - $tblinvoices['total'];
+    $fee = $amount - $invoice['total'];
 
     /**
      * Validate Callback Invoice ID.
@@ -117,12 +121,12 @@ if ($checksum === $_SERVER["HTTP_QUICKPAY_CHECKSUM_SHA256"]) {
                     'newitemtaxed' => array("0")
                 ];
                 /** Update invoice request */
-                localAPI("updateinvoice", $values, $adminuser);
+                localAPI("UpdateInvoice", $values, $adminuser);
             }
 
             if (
                 //  (('authorize' == $operationType) && ("Subscription" != $orderType)) ||
-                 ('recurring' == $operationType)
+                 ('recurring' == $operationType || 'authorize' == $operationType)
                 ) {
 
                 logTransaction(/**gatewayName*/'quickpay', /**debugData*/['operationType' => print_r($operationType, true)], 'operationType');
@@ -134,13 +138,13 @@ if ($checksum === $_SERVER["HTTP_QUICKPAY_CHECKSUM_SHA256"]) {
                 ];
 
                 /** Update invoice request */
-                localAPI("updateinvoice", $updateValues, $adminuser);
+                localAPI("UpdateInvoice", $updateValues, $adminuser);
             } else {
                 /** Api request parameters */
                 $values = [
                     'invoiceid' => $invoiceid,
                     'transid' => $transid,
-                    'amount' => $tblinvoices['total'] + $fee,
+                    'amount' => $invoice['total'] + $fee,
                     'fees' => $fee,
                     'gateway' => $gatewayModuleName,
                     'date' => date("Y-m-d H:i:s"),
@@ -159,7 +163,7 @@ if ($checksum === $_SERVER["HTTP_QUICKPAY_CHECKSUM_SHA256"]) {
                  * @param string $gatewayModule  Gateway module name
                  * @param string $date           Current date
                  */
-                localAPI("addinvoicepayment", $values, $adminuser);
+                localAPI("AddInvoicePayment", $values, $adminuser);
             }
         }
 
@@ -251,11 +255,21 @@ if ($checksum === $_SERVER["HTTP_QUICKPAY_CHECKSUM_SHA256"]) {
                 ];
 
                 /** Update invoice request */
-                localAPI("updateinvoice", $updateValues, $adminuser);
+                localAPI("UpdateInvoice", $updateValues, $adminuser);
+            } else {
+                $orderModel = new Order;
+                $invoiceModel = Invoice::find((int) $invoiceid);
+                /**
+                 * Accept order if invoice paid (set status=Active)
+                 */
+                if ('Paid' == $invoiceModel->status) {
+                    $orderModel->where('invoiceid', (int) $invoiceid)->update(['status' => 'Active']);
+                }
             }
 
             /** Mark payment in custom table as processed */
-            full_query("UPDATE quickpay_transactions SET paid = '1' WHERE transaction_id = '" . (int)$transid . "'");
+            $qpTransaction = Capsule::table('quickpay_transactions')->where('transaction_id', (int) $transid);
+            $qpTransaction->update(['paid' => 1]);
         }
         /** Save to Gateway Log: name, data array, status */
         logTransaction(/**gatewayName*/$gateway["name"], /**debugData*/$_POST, "Successful");
