@@ -9,11 +9,11 @@ Pull requests welcome!
 
 ## Supported WHMCS versions
 * The plugin has been tested with:
-   - WHMCS up to version 8.1.3
+   - WHMCS up to version 8.5.1
    - PHP up to version 7.3.28
 
-## [Installation](https://learn.quickpay.net/helpdesk/en/articles/integrations/whmcs/)
-* Copy the content of the zip archive to the root of your WHMCS installation on your webserver.Preserve all folders, the files should end in the path /modules/gateways.
+## [Installation](https://quickpay.net/helpdesk/integrations/whmcs/)
+* Copy the content of the zip archive to the root of your WHMCS installation on your webserver. Preserve all folders, the files should end in the path `/modules/gateways`.
 * Open the administration area of your WHMCS installation, and log in as admin.
 * Go to **Setup** > **Payments** > **Payment gateways**
 * Choose QuickPay in the dropdown and push the button **Activate**
@@ -24,8 +24,6 @@ Pull requests welcome!
    - API key
    - Private Key
    - Agreement ID
-   - Continue URL
-   - Cancel URL
    - The rest of the fields are optional
 * Press the **Save Changes** button
 * You are now ready to use QuickPay as payment provider, you must choose payment method for each group you create.
@@ -33,7 +31,24 @@ Pull requests welcome!
    - Configure a **Custom Thank You Page** to which the user will be redirected after a payment. In order to setup a **Custom Thank You Page** fill the **Custom Thank You Page URL** field with the internal path to your custom page like following example or the field empty for the default **WHMCS Thank You Page**:
       - Example: custompages/thankyoupage.php
 
+## How to:
+   1. Capture
+      - When "Autocapture" is set to "1", the orders are captured automatically (set to Paid)
+      - When "Autocapture" is set to "0" you can capture the order manually from Quickpay merchant dashboard and then create a transaction for the invoice, in the "Add Payment" tab (invoice details view) (use payment id from Quickpay merchant dashboard).
+   1. Refund:
+      - To refund an order you can use `Refund` tab from the invoice (only if the order has been captured previously).
+   1. Cancel:
+      - To cancel an order you can do it from Quickpay merchant dashboard.
+
 ## Changelog
+#### 2.5.0:
+ * Fixed some issues
+   - added possibility to pay a failed automatic recurring payment
+   - fixed set "Paid" (not payment pending) on automatic recurring payment when auto_capture in on
+#### 2.4.5:
+ * small changes
+   - removed inexistent file inclusion (stop warning from module log)
+   - added "how to" section to Readme
 #### 2.4.4:
  * Fixed some issues
    - Date paid not show on invoice summary in admin panel

@@ -126,9 +126,8 @@ if ($checksum === $_SERVER["HTTP_QUICKPAY_CHECKSUM_SHA256"]) {
 
             if (
                 //  (('authorize' == $operationType) && ("Subscription" != $orderType)) ||
-                 ('recurring' == $operationType || 'authorize' == $operationType)
-                ) {
-
+                'authorize' == $operationType
+            ) {
                 logTransaction(/**gatewayName*/'quickpay', /**debugData*/['operationType' => print_r($operationType, true)], 'operationType');
                 logTransaction(/**gatewayName*/'quickpay', /**debugData*/['orderType' => print_r($orderType, true)], 'orderType');
 
@@ -139,7 +138,21 @@ if ($checksum === $_SERVER["HTTP_QUICKPAY_CHECKSUM_SHA256"]) {
 
                 /** Update invoice request */
                 localAPI("UpdateInvoice", $updateValues, $adminuser);
-            } else {
+            }
+            elseif ('recurring' == $operationType && 'capture' == $operationType) {
+
+                logTransaction(/**gatewayName*/'quickpay', /**debugData*/['operationType' => print_r($operationType, true)], 'operationType');
+                logTransaction(/**gatewayName*/'quickpay', /**debugData*/['orderType' => print_r($orderType, true)], 'orderType');
+
+                $updateValues = [
+                    'invoiceid' => $invoiceid,
+                    'status' => "Paid"
+                ];
+
+                /** Update invoice request */
+                localAPI("UpdateInvoice", $updateValues, $adminuser);
+            }
+            else {
                 /** Api request parameters */
                 $values = [
                     'invoiceid' => $invoiceid,
@@ -175,6 +188,32 @@ if ($checksum === $_SERVER["HTTP_QUICKPAY_CHECKSUM_SHA256"]) {
             /** In order to find any added fee, we must find the original order amount in the database */
             $query_quickpay_transaction = select_query("quickpay_transactions", "transaction_id,paid", ["transaction_id" => (int)$transid]);
             $quickpay_transaction = mysql_fetch_array($query_quickpay_transaction);
+
+            /**
+             * Get QP transaction by invoice number if the request is from a previous failed recurring
+             * Update with proper data
+             */
+            if ('1' == $_GET['pay_recurring_failed'] && 'capture' == $operationType) {
+            // if ('1' == $_GET['pay_failed_recurring']) {
+                $qpTransaction = Capsule::table('quickpay_transactions')
+                                            ->where('invoice_id', (int) $invoiceid)
+                                            ->where('paid', 0)
+                                            ->orderBy("id", "DESC")->first();
+
+                if ($qpTransaction) {
+                        Capsule::table('quickpay_transactions')
+                            ->where('invoice_id', (int) $invoiceid)
+                            ->where('paid', 0)
+                            ->update([
+                                'transaction_id' => (int)$transid,
+                                'payment_link' => '',
+                                'amount' => $amount,
+                                'paid' => 1,
+                            ]);
+                }
+                return;
+            }
+
 
             /** If not Paid. */
             if ('0' == $quickpay_transaction['paid']) {

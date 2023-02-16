@@ -19,10 +19,10 @@
  */
 
 /** Require libraries needed for gateway module functions. */
-use Illuminate\Database\Capsule\Manager as Capsule;
+use Illuminate\Database\Capsule\Manager as CapsuleManager;
+use WHMCS\Database\Capsule;
 
 require_once 'quickpay/quickpay_countries.php';
-include 'quickpay/quickpay_clientareahook.php';
 
 if (!defined("WHMCS")) {
     die("This file cannot be accessed directly");
@@ -79,7 +79,7 @@ function quickpay_config()
         "quickpay_versionnumber" => [
             "FriendlyName" => "Installed module version",
             "Type" => null,
-            "Description" => "2.4.4",
+            "Description" => "2.5.0",
             "Size" => "20",
             "disabled" => true
         ],
@@ -323,7 +323,7 @@ function quickpay_cancelSubscription($params)
 function helper_get_payment($params)
 {
     /** Get PDO and determine if payment exists and is usable */
-    $pdo = Capsule::connection()->getPdo();
+    $pdo = CapsuleManager::connection()->getPdo();
 
     /** Get transaction data from quickpay custom table */
     $statement = $pdo->prepare("SELECT * FROM quickpay_transactions WHERE invoice_id = :invoice_id ORDER BY id DESC");
@@ -573,7 +573,7 @@ function helper_update_subscription($params)
     $payment_link = helper_quickpay_request($params['apikey'], sprintf('subscriptions/%s/link', $newSubscription->id), $request, 'PUT');
 
     /** Save transaction data to custom table */
-    $pdo = Capsule::connection()->getPdo();
+    $pdo = CapsuleManager::connection()->getPdo();
     $pdo->beginTransaction();
 
     try {
@@ -668,10 +668,35 @@ function helper_create_payment_link($paymentId, $params, $type = 'payment')
 
         logActivity('Quickpay payment response: ' . json_encode($response));
 
+        /** Old SubscriptionId */
+        $subscriptionId = $paymentId;
+
         /** Current transaction id */
         $paymentId = $response->id;
 
         if (!isset($response->id)) {
+
+            $recurringFailedUrl = $params['systemurl'] . 'modules/gateways/quickpay'
+                                    . '/quickpay_pay_failed_recurring.php?id=' . $params['invoiceid'] . '&recurring_failed=1';
+
+            $qpTransaction = Capsule::table('quickpay_transactions')
+                                ->where('transaction_id', $subscriptionId)
+                                ->where('invoice_id', (int) $params['invoiceid'])
+                                ->where('paid', 0)
+                                ->orderBy("id", "DESC")->first();
+
+            if (!$qpTransaction) {
+                /** Replace old payment link if one already exists */
+                Capsule::table('quickpay_transactions')
+                    ->insert([
+                        'invoice_id' => $params['invoiceid'],
+                        'transaction_id' => $subscriptionId,
+                        'payment_link' => $recurringFailedUrl,
+                        'amount' => $params['amount'],
+                        'paid' => 0,
+                ]);
+            }
+
             throw new Exception('Failed to create recurring payment');
         }
 
@@ -700,7 +725,7 @@ function helper_create_payment_link($paymentId, $params, $type = 'payment')
     }
 
     /** Save transaction data to custom table */
-    $pdo = Capsule::connection()->getPdo();
+    $pdo = CapsuleManager::connection()->getPdo();
     $pdo->beginTransaction();
 
     try {
@@ -920,7 +945,7 @@ function helper_update_table(PDO $pdo)
 function helper_verify_table()
 {
     /** Get PDO and check if table exists */
-    $pdo = Capsule::connection()->getPdo();
+    $pdo = CapsuleManager::connection()->getPdo();
 
     $result = $pdo->query("SHOW TABLES LIKE 'quickpay_transactions'");
     $row = $result->fetch(PDO::FETCH_ASSOC);
