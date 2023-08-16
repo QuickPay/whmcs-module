@@ -79,7 +79,7 @@ function quickpay_config()
         "quickpay_versionnumber" => [
             "FriendlyName" => "Installed module version",
             "Type" => null,
-            "Description" => "2.5.0",
+            "Description" => "2.5.1",
             "Size" => "20",
             "disabled" => true
         ],
@@ -136,27 +136,27 @@ function quickpay_config()
             "Value" => "creditcard"
         ],
         "prefix" => [
-            "FriendlyName" => "Order Prefix",
+            "FriendlyName" => "Order Prefix (optional)",
             "Type" => "text",
             "Size" => "30"
         ],
         "quickpay_branding_id" => [
-            "FriendlyName" => "Branding ID",
+            "FriendlyName" => "Branding ID (optional)",
             "Type" => "text",
             "Size" => "30"
         ],
         "quickpay_custom_thankyou_url" => [
-            "FriendlyName" => "Custom Thank-You Page URL",
+            "FriendlyName" => "Custom Thank-You Page URL (optional)",
             "Type" => "text",
             "Size" => "60"
         ],
         "quickpay_google_analytics_tracking_id" => [
-            "FriendlyName" => "Google Analytics Tracking ID",
+            "FriendlyName" => "Google Analytics Tracking ID (optional)",
             "Type" => "text",
             "Size" => "30"
         ],
         "quickpay_google_analytics_client_id" => [
-            "FriendlyName" => "Google Analytics Client ID",
+            "FriendlyName" => "Google Analytics Client ID (optional)",
             "Type" => "text",
             "Size" => "30",
         ],
@@ -597,10 +597,14 @@ function helper_update_subscription($params)
             ':amount' =>  number_format(($oldSubscription->link->amount/100.0), 2, '.', '')
         ]);
 
-        $pdo->commit();
+        if ($pdo->inTransaction()){
+            $pdo->commit();
+        }
     } catch (\Exception $e) {
         /** DB operations fail */
-        $pdo->rollBack();
+        if ($pdo->inTransaction()) {
+            $pdo->rollBack();
+        }
 
         throw new Exception('Failed to create payment link, please try again later');
     }
@@ -747,10 +751,14 @@ function helper_create_payment_link($paymentId, $params, $type = 'payment')
             ':amount' => $params['amount']
         ]);
 
-        $pdo->commit();
+        if ($pdo->inTransaction()) {
+            $pdo->commit();
+        }
     } catch (\Exception $e) {
         /** DB operations fail */
-        $pdo->rollBack();
+        if ($pdo->inTransaction()) {
+            $pdo->rollBack();
+        }
 
         throw new Exception('Failed to create payment link, please try again later');
     }
@@ -905,10 +913,16 @@ function helper_install_table(PDO $pdo)
         $statement = $pdo->prepare($query);
         $statement->execute();
 
-        $pdo->commit();
+        if ($pdo->inTransaction()) {
+            $pdo->commit();
+        }
+
     } catch (\Exception $e) {
         /** Fail */
-        $pdo->rollBack();
+        if ($pdo->inTransaction()) {
+            $pdo->rollBack();
+        }
+
         logActivity('Error during quickpay table creation: ' . $e->getMessage());
     }
 }
@@ -930,10 +944,14 @@ function helper_update_table(PDO $pdo)
         $statement = $pdo->prepare($query);
         $statement->execute();
 
-        $pdo->commit();
+        if ($pdo->inTransaction()) {
+            $pdo->commit();
+        }
     } catch (\Exception $e) {
         /** Fail */
-        $pdo->rollBack();
+        if ($pdo->inTransaction()) {
+            $pdo->rollBack();
+        }
 
         logActivity('Error during quickpay table update: ' . $e->getMessage());
     }
@@ -952,6 +970,7 @@ function helper_verify_table()
 
     /** If not create it */
     if (false === $row) {
+        logActivity('quickpay_transactions table missing, creating table');
         helper_install_table($pdo);
     } else {
         /** check table has columns added in 2020_07 version */
@@ -959,6 +978,7 @@ function helper_verify_table()
         $row = $result->fetch(PDO::FETCH_ASSOC);
 
         if (false === $row) {
+            logActivity('quickpay_transactions table columns missing, updating table');
             /** If not, add them */
             helper_update_table($pdo);
         }

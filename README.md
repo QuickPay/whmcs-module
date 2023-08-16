@@ -41,6 +41,10 @@ Pull requests welcome!
       - To cancel an order you can do it from Quickpay merchant dashboard.
 
 ## Changelog
+#### 2.5.1:
+ * Fixed some issues
+   - Fixed plugin not working on latest WHMCS versions/PHP versions
+   - Added (optional) to optional fields
 #### 2.5.0:
  * Fixed some issues
    - added possibility to pay a failed automatic recurring payment
