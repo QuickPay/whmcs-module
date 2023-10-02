@@ -664,10 +664,10 @@ function helper_create_payment_link($paymentId, $params, $type = 'payment')
         $request["QuickPay-Callback-Url"] = $request['callback_url'];
         /** Only for MobilePay subscription. */
         $request["description"] = $params['description'];
-        $request["due_date"] = date("Y-m-d", strtotime('+24 hours'));
+        $request["auto_capture_at"] = date("Y-m-d", strtotime('+48 hours'));
 
         /** Request endpoint */
-        $endpoint = sprintf('subscriptions/%s/recurring', $paymentId/** Subscription_id */);
+        $endpoint = sprintf('subscriptions/%s/recurring?synchronized', $paymentId/** Subscription_id */);
         $response = helper_quickpay_request($apiKey, $endpoint, $request, 'POST');
 
         logActivity('Quickpay payment response: ' . json_encode($response));
