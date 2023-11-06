@@ -256,7 +256,17 @@ if ($checksum === $_SERVER["HTTP_QUICKPAY_CHECKSUM_SHA256"]) {
                          * Get order ID & accept order (set status=Active)
                          */
                         $orderData = helper_get_order_id(/*Hosting id*/ $recurringData['primaryserviceid']);
-                        localAPI('AcceptOrder', $orderData, $adminuser);
+
+                        // Check mobilepay_mark_as_paid_before_capture
+                        if ($gateway['mobilepay_mark_as_paid_before_capture'] == 'on') {
+                            $updateValues = [
+                                'invoiceid' => $invoiceid,
+                                'status' => "Paid"
+                            ];
+                            
+                            /** Update invoice request */
+                            localAPI("UpdateInvoice", $updateValues, $adminuser);
+                        }
                     }
                     else
                     {
@@ -273,7 +283,6 @@ if ($checksum === $_SERVER["HTTP_QUICKPAY_CHECKSUM_SHA256"]) {
                             quickpay_cancelSubscription($params);
                             /** Update the subscription id */
                             update_query("tblhosting", ["subscriptionid" => $transid], ["id" => $recurringData['primaryserviceid']]);
-
                         }
                     }
 

@@ -166,6 +166,11 @@ function quickpay_config()
             "Value" => "Pay Now",
             "Size" => "60"
         ],
+        "mobilepay_mark_as_paid_before_capture" => [
+            "FriendlyName" => "Mark as paid before capture of payment",
+            "Type" => "yesno",
+            "Description" => "Mark invoice as paid before capture (applies to MobilePay Subscriptions only)",
+        ],
     ];
 }
 
