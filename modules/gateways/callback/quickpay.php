@@ -144,39 +144,19 @@ if ($checksum === $_SERVER["HTTP_QUICKPAY_CHECKSUM_SHA256"]) {
                 logTransaction(/**gatewayName*/'quickpay', /**debugData*/['operationType' => print_r($operationType, true)], 'operationType');
                 logTransaction(/**gatewayName*/'quickpay', /**debugData*/['orderType' => print_r($orderType, true)], 'orderType');
 
-                $updateValues = [
-                    'invoiceid' => $invoiceid,
-                    'status' => "Paid"
-                ];
+                // $updateValues = [
+                //     'invoiceid' => $invoiceid,
+                //     'status' => "Paid"
+                // ];
 
-                /** Update invoice request */
-                localAPI("UpdateInvoice", $updateValues, $adminuser);
+                // /** Update invoice request */
+                // localAPI("UpdateInvoice", $updateValues, $adminuser);
+                addInvoicePayment($invoiceid, $transid, $amount, $fee, $gatewayModuleName);
+
+
             }
             else {
-                /** Api request parameters */
-                $values = [
-                    'invoiceid' => $invoiceid,
-                    'transid' => $transid,
-                    'amount' => $invoice['total'] + $fee,
-                    'fees' => $fee,
-                    'gateway' => $gatewayModuleName,
-                    'date' => date("Y-m-d H:i:s"),
-                ];
-
-                /**
-                 * Add Invoice Payment.
-                 *
-                 * Applies a payment transaction entry to the given invoice ID.
-                 * This also modify invoice status to "Paid" and add date in "datepaid" column
-                 *
-                 * @param int $invoiceId         Invoice ID
-                 * @param string $transactionId  Transaction ID
-                 * @param float $paymentAmount   Amount paid (defaults to full balance)
-                 * @param float $paymentFee      Payment fee (optional)
-                 * @param string $gatewayModule  Gateway module name
-                 * @param string $date           Current date
-                 */
-                localAPI("AddInvoicePayment", $values, $adminuser);
+                addInvoicePayment($invoiceid, $transid, $amount, $fee, $gatewayModuleName);
             }
         }
 
@@ -259,13 +239,9 @@ if ($checksum === $_SERVER["HTTP_QUICKPAY_CHECKSUM_SHA256"]) {
 
                         // Check mobilepay_mark_as_paid_before_capture
                         if ($gateway['mobilepay_mark_as_paid_before_capture'] == 'on') {
-                            $updateValues = [
-                                'invoiceid' => $invoiceid,
-                                'status' => "Paid"
-                            ];
-                            
-                            /** Update invoice request */
-                            localAPI("UpdateInvoice", $updateValues, $adminuser);
+                            if($invoice['status'] == 'Unpaid') {
+                                addInvoicePayment($invoiceid, $transid, $amount, $fee, $gatewayModuleName);
+                            }
                         }
                     }
                     else
