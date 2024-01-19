@@ -137,7 +137,8 @@ if ($checksum === $_SERVER["HTTP_QUICKPAY_CHECKSUM_SHA256"]) {
                 ];
 
                 /** Update invoice request */
-                localAPI("UpdateInvoice", $updateValues, $adminuser);
+                if($invoice['status'] != 'Paid')
+                    localAPI("UpdateInvoice", $updateValues, $adminuser);
             }
             elseif ('recurring' == $operationType && 'capture' == $operationType) {
 
@@ -151,12 +152,14 @@ if ($checksum === $_SERVER["HTTP_QUICKPAY_CHECKSUM_SHA256"]) {
 
                 // /** Update invoice request */
                 // localAPI("UpdateInvoice", $updateValues, $adminuser);
-                addInvoicePayment($invoiceid, $transid, $amount, $fee, $gatewayModuleName);
+                if($invoice['status'] != 'Paid')
+                    addInvoicePayment($invoiceid, $transid, $amount, $fee, $gatewayModuleName);
 
 
             }
             else {
-                addInvoicePayment($invoiceid, $transid, $amount, $fee, $gatewayModuleName);
+                if($invoice['status'] != 'Paid')
+                    addInvoicePayment($invoiceid, $transid, $amount, $fee, $gatewayModuleName);
             }
         }
 
@@ -239,7 +242,7 @@ if ($checksum === $_SERVER["HTTP_QUICKPAY_CHECKSUM_SHA256"]) {
 
                         // Check mobilepay_mark_as_paid_before_capture
                         if ($gateway['mobilepay_mark_as_paid_before_capture'] == 'on') {
-                            if($invoice['status'] == 'Unpaid') {
+                            if($invoice['status'] != 'Paid') {
                                 addInvoicePayment($invoiceid, $transid, $amount, $fee, $gatewayModuleName);
                             }
                         }
